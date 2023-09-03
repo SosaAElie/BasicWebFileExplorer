@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>File Server</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <style>
+            .flex-container{
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+                justify-content: center;
+                align-items: center;
+                background-color: blanchedalmond;
+            }
+        </style>
+    </head>
+    <body>
+        <div class = "flex-container">
+            <form enctype="multipart/form-data">
+                <label>Select File to Upload</label>
+                <input type="file"> 
+                <button type = "submit">Click Me To Submit File</button>
+            </form>
+        </div>
+
+        <script defer>
+            const form = document.getElementsByTagName("form")[0];
+
+            form.addEventListener("submit", event => {
+                event.preventDefault()
+                const fileReader = new FileReader();
+
+                fileReader.onload = (event) => {
+                    const fetchObject = {
+                        method: "POST",
+                        body:JSON.stringify({
+                            name: fileName,
+                            data: btoa(event.target.result),
+                        }),
+                    }
+                    console.log(event.target)
+                    fetch("http://192.168.1.104:8080/upload", fetchObject)
+                        .then(response => response.text())
+                        .then(data => console.log(data))
+                };
+                const fileObject = event.target[0].files[0]
+                const fileName = event.target[0].value.split("\\")[2];
+                fileReader.readAsBinaryString(fileObject)
+            })
+
+
+
+
+
+        </script>
+    </body>
+</html>
