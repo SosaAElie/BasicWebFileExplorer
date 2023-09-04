@@ -22,6 +22,7 @@ class FileServer{
     }
 
     filePathExist(urlPath){
+        
         if(Object.keys(this.filePaths).indexOf(urlPath) > -1) return true;
         else return false;
     }
@@ -68,18 +69,20 @@ class FileServer{
     }
 
     pageNotFound(req, res){
-        console.log(req.url);
+        console.log("This url path was not found: " + req.url);
         res.writeHead(404, this.headers)
         res.end("Filepath does not exist")
     }
 
     start(){
         this.httpServer.on("request", (req, res)=>{
-            console.log("Recieved Request!");
-            const urlPath = req.url.replace(/%20/g, " ");//regex expression to convert '%20' from the url to spaces
+            console.log("Recieved Client Request!");
+            const urlPath = req.url.replace(/%20/g, " ").replace(/%E2%80%90/g, "-");//regex expression to convert '%20' from the url to spaces
+            
             const method = req.method;
 
             if(!this.filePathExist(urlPath)) {
+                console.log("Error with the key name")
                 this.pageNotFound(req,res);
                 return null;
             }
@@ -122,33 +125,32 @@ function receiveFile(req, res, headers, serverInstance){
 
 function sendFileNames(req, res, headers){
     const fileData = fs.readdirSync("../BasicWebFileExplorerDownloads");
+    
     res.writeHead(200, headers);
     res.end(JSON.stringify({
-        files:fileData,
+        files:fileData.filter(file => file !== ".DS_Store"),
     }))
 }
 
 function sendFile(req, res, headers){
-    const reqFile = req.url.replace(/%20/g, " "); //regex expression to convert '%20' from the url to spaces
+    const reqFile = req.url.replace(/%20/g, " ").replace(/%E2%80%90/g, "-"); //regex expression to convert '%20' from the url to spaces
     const fileData = readFileSync(`../BasicWebFileExplorerDownloads/${reqFile}`);
     res.writeHead(200, headers);
-    res.write(fileData);
-    res.end("Success!");
+    res.end(fileData);
 
 }
 
 function main(){
     const fileServer = new FileServer("192.168.1.104", 8080, ()=> console.log("started"));
-    fileServer.setUrlPath("/upload", "POST", receiveFile)
-    fileServer.setUrlPath("/files", "GET", sendFileNames)
+    fileServer.setUrlPath("/upload", "POST", receiveFile);
+    fileServer.setUrlPath("/files", "GET", sendFileNames);
 
     const files = fs.readdirSync("../BasicWebFileExplorerDownloads");
     const fileMethods = files.map(()=>"GET");
-    const fileCbs = files.map(()=>sendFile)
-
-    fileServer.setMultipleUrlPaths(files, fileMethods, fileCbs)
+    const fileCbs = files.map(()=>sendFile);
     
-    fileServer.start()
+    fileServer.setMultipleUrlPaths(files, fileMethods, fileCbs);
+    fileServer.start();
 }
 
-main()
+main();

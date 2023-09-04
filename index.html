@@ -106,10 +106,12 @@
                     fetch("http://192.168.1.104:8080/upload", fetchObject)
                         .then(response => response.text())
                         .then(data => {
-                            file_container.innerHTML = "";
+                            
                             fetch("http://192.168.1.104:8080/files")
                                 .then(res => res.json())
                                 .then(data => {
+                                
+                                    file_container.innerHTML = "";
                                     data.files.forEach(createFileCard)
                                 })
                         })
@@ -130,7 +132,7 @@
                         anchor.href = url;
                         anchor.download = filename;
                         function clickHandler(){
-                            console.log("hello")
+                            
                             setTimeout(() => {
                                 URL.revokeObjectURL(url);
                                 removeEventListener('click', clickHandler);
