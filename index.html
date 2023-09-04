@@ -9,10 +9,34 @@
             .flex-container{
                 display: flex;
                 flex-direction: column;
-                height: 100vh;
                 justify-content: center;
                 align-items: center;
                 background-color: blanchedalmond;
+                gap:10px;
+            }
+            .file-card{
+                display:grid;
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 0.5fr 0.5fr;
+                border-style: solid;
+                border-radius: 10%;
+                align-items: center;
+            }
+            img{
+                height: 100px;
+                justify-self: center;
+            }
+            .file-card>h2{
+                text-align: center;
+            }
+            .button-container{
+                display: flex;
+                justify-content: space-evenly;
+            }
+            #file-container{
+                display: flex;
+                flex-direction: column;
+                gap:10px;
             }
         </style>
     </head>
@@ -23,10 +47,48 @@
                 <input type="file"> 
                 <button type = "submit">Click Me To Submit File</button>
             </form>
+            <div id = "file-container"></div>
         </div>
 
         <script defer>
             const form = document.getElementsByTagName("form")[0];
+            const file_container = document.getElementById("file-container");
+            fetch("http://192.168.1.104:8080/files")
+                .then(res => res.json())
+                .then(data => {
+                    data.files.forEach(createFileCard)
+                })
+
+            function createFileCard(fileName){
+                const fileCard = document.createElement("div");
+                fileCard.className = "file-card";
+
+                const fileImage = document.createElement("img");
+                fileImage.src = "./defaultFileImage.png";
+
+                const filenameHeading = document.createElement("h2");
+                filenameHeading.appendChild(document.createTextNode(fileName));
+
+                const buttonContainer = document.createElement("div");
+                buttonContainer.className = "button-container";
+
+                const downloadButton = document.createElement("button");
+                downloadButton.appendChild(document.createTextNode("Download"));
+                downloadButton.addEventListener("click", downloadFile)
+                const deleteButton = document.createElement("button");
+                deleteButton.appendChild(document.createTextNode("Delete"));
+
+
+                buttonContainer.appendChild(downloadButton);
+                buttonContainer.appendChild(deleteButton);
+
+                fileCard.appendChild(fileImage);
+                fileCard.appendChild(filenameHeading);
+                fileCard.appendChild(buttonContainer);
+
+                file_container.appendChild(fileCard);
+            }
+
 
             form.addEventListener("submit", event => {
                 event.preventDefault()
@@ -40,19 +102,45 @@
                             data: btoa(event.target.result),
                         }),
                     }
-                    console.log(event.target)
+                   
                     fetch("http://192.168.1.104:8080/upload", fetchObject)
                         .then(response => response.text())
-                        .then(data => console.log(data))
+                        .then(data => {
+                            file_container.innerHTML = "";
+                            fetch("http://192.168.1.104:8080/files")
+                                .then(res => res.json())
+                                .then(data => {
+                                    data.files.forEach(createFileCard)
+                                })
+                        })
                 };
                 const fileObject = event.target[0].files[0]
                 const fileName = event.target[0].value.split("\\")[2];
                 fileReader.readAsBinaryString(fileObject)
             })
-
-
-
-
+            
+            function downloadFile(event){
+                const filename = this.parentNode.parentNode.children[1].textContent;
+                fetch(`http://192.168.1.104:8080/${filename}`)
+                    .then(res => res.blob())
+                    .then(data => {
+                        
+                        const url = URL.createObjectURL(data);
+                        const anchor = document.createElement("a"); 
+                        anchor.href = url;
+                        anchor.download = filename;
+                        function clickHandler(){
+                            console.log("hello")
+                            setTimeout(() => {
+                                URL.revokeObjectURL(url);
+                                removeEventListener('click', clickHandler);
+                            }, 150)
+                        };
+                        anchor.addEventListener("click", clickHandler);
+                        anchor.click();
+                    })
+                    
+            }
 
         </script>
     </body>

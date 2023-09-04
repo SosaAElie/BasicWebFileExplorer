@@ -1,61 +1,109 @@
-import { writeFile, writeFileSync } from "fs";
+import {readFileSync, writeFileSync } from "fs";
 import http from "http";
-import { url } from "inspector";
+import fs from "fs";
+
 
 class FileServer{
-    constructor(serverPath, ipAddress, port, callback){
-        this.serverPath = serverPath;
+    
+    constructor(ipAddress = None, port = None, callback = ()=> console.log("Started Server")){
         this.ipAddress = ipAddress;
         this.port = port;
-        this.callback = callback;
+        this.cb = callback;
         this.httpServer = http.createServer();
+
         this.headers = {
                 'Access-Control-Allow-Origin': '*', /* @dev First, read about security */
                 'Access-Control-Allow-Methods': 'OPTIONS, POST, GET',
                 'Access-Control-Max-Age': 2592000, // 30 days
                 /** add other headers as per requirement */
             }
+
         this.filePaths = {};
     }
 
-    getServerPath(){
-        return this.serverPath;
+    filePathExist(urlPath){
+        if(Object.keys(this.filePaths).indexOf(urlPath) > -1) return true;
+        else return false;
+    }
+    
+    getUrlPathMethods(urlPath){
+        return this.filePaths[urlPath].methods;
     }
 
-    setFilePaths(urlPath, method, callback){
-        if(this.filePaths[urlPath])return 
+    getUrlPathFunctions(urlPath){
+        return this.filePaths[urlPath].functions;
+    }
+
+    getUrlPaths(){
+        return Object.keys(this.filePaths);
+    }
+
+    setMethod(urlPath, method, cb){
+        this.filePath[urlPath].methods.push(method.toUpperCase());
+        this.filePaths[urlPath].functions.push(cb);
+        return null;
+    }
+
+    setUrlPath(urlPath, method, cb){
+        if(this.filePathExist(urlPath)){
+            console.log("File Path Exists Already, use setMethod method");
+            return null;
+        };
 
         this.filePaths[urlPath] = {
-            method:method,
-            function:callback,
-        }
+            methods:[method],
+            functions:[cb]
+        };
+        return null;
     }
 
-    listenOnFilePaths(){
+    setMultipleUrlPaths(urlPaths, methods, cbs){
+        const arrayLength = urlPaths.length;
+        if(methods.length !== arrayLength && cbs.length !== arrayLength){
+            console.log("All the arrays are not the same length, all arrays need to be the same length");
+            return null;
+        }
+        for(let i = 0; i < arrayLength; i++) this.setUrlPath(`/${urlPaths[i]}`, methods[i], cbs[i]);
+        return null;
+    }
+
+    pageNotFound(req, res){
+        console.log(req.url);
+        res.writeHead(404, this.headers)
+        res.end("Filepath does not exist")
+    }
+
+    start(){
         this.httpServer.on("request", (req, res)=>{
             console.log("Recieved Request!");
-            const filepath = req.url;
-            this.filePaths[filepath]
-            // if(req.url === "/upload" && req.method === "POST") receiveFile(req, res, this.headers, "Finished Downloading File")
+            const urlPath = req.url.replace(/%20/g, " ");//regex expression to convert '%20' from the url to spaces
+            const method = req.method;
+
+            if(!this.filePathExist(urlPath)) {
+                this.pageNotFound(req,res);
+                return null;
+            }
+
+            const index = this.getUrlPathMethods(urlPath).indexOf(method);
+
+            if(index < 0) {
+                this.pageNotFound(req, res);
+                return null;
+            }
+
+            const methodFunction = this.filePaths[urlPath].functions[index];
+
+            methodFunction(req, res, this.headers, this);
+            return null;
         })
-    }
 
-    run(){
-        this.httpServer.listen(this.port,this.ipAddress, this.callback)
+        this.httpServer.listen(this.port,this.ipAddress, this.cb)
     }
 
 }
 
-function main(){
-    const fileServer = new FileServer("Desktop", "192.168.1.104", 8080, ()=> console.log("started"));
-    
-
-}
-
-
-function receiveFile(req, res, headers, responseMessage){
+function receiveFile(req, res, headers, serverInstance){
     let dataRecieved = "";
-
     req.on("data", stream=>{
         dataRecieved+=stream
     })
@@ -63,11 +111,44 @@ function receiveFile(req, res, headers, responseMessage){
     req.on("end", () =>{
         console.log("Finished Recieving Data")
         const data = JSON.parse(dataRecieved);
-        writeFileSync(`../${data.name}`, Buffer.from(data.data, "base64"))
+        writeFileSync(`../BasicWebFileExplorerDownloads/${data.name}`, Buffer.from(data.data, "base64"))
+        serverInstance.setUrlPath(`/${data.name}`, "GET", sendFile);
     })
 
     res.writeHead(200, headers);
-    res.end(responseMessage);
+    res.end("Success");
+    
 }
 
+function sendFileNames(req, res, headers){
+    const fileData = fs.readdirSync("../BasicWebFileExplorerDownloads");
+    res.writeHead(200, headers);
+    res.end(JSON.stringify({
+        files:fileData,
+    }))
+}
 
+function sendFile(req, res, headers){
+    const reqFile = req.url.replace(/%20/g, " "); //regex expression to convert '%20' from the url to spaces
+    const fileData = readFileSync(`../BasicWebFileExplorerDownloads/${reqFile}`);
+    res.writeHead(200, headers);
+    res.write(fileData);
+    res.end("Success!");
+
+}
+
+function main(){
+    const fileServer = new FileServer("192.168.1.104", 8080, ()=> console.log("started"));
+    fileServer.setUrlPath("/upload", "POST", receiveFile)
+    fileServer.setUrlPath("/files", "GET", sendFileNames)
+
+    const files = fs.readdirSync("../BasicWebFileExplorerDownloads");
+    const fileMethods = files.map(()=>"GET");
+    const fileCbs = files.map(()=>sendFile)
+
+    fileServer.setMultipleUrlPaths(files, fileMethods, fileCbs)
+    
+    fileServer.start()
+}
+
+main()
